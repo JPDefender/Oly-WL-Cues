@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>WL Error Correction — Coach Reference</title>
+<meta name="description" content="USAW-framework error correction reference for Olympic weightlifting coaches."/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏋</text></svg>"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #f3f5f9;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #root { min-height: 100vh; }
+  input::placeholder { color: rgba(255,255,255,0.45); }
+  input:focus { outline: none; border-color: rgba(255,255,255,0.35) !important; background: rgba(255,255,255,0.15) !important; }
+  button { -webkit-tap-highlight-color: transparent; }
+  button:active { transform: scale(0.97); }
+  @media (max-width: 600px) {
+    .bp-grid { grid-template-columns: 1fr !important; }
+    .bp-phase-cell { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.9/babel.min.js"></script>
+
+<script type="text/babel" data-type="module">
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
+
+const LIFTS = {
+  snatch: {
+    label: "Snatch", color: "#1a2744", accent: "#3b5998", light: "#dce6f7",
+    phases: [
+      { name: "First Pull",
+        errors: [
+          { error: "Hips shoot up faster than shoulders", freq: "high",
+            rootCause: "Insufficient quad strength at deep knee angles; hips set too low in start; yanking without establishing tension first",
+            downstream: "Balance shifts onto toes; back goes horizontal; bar drifts forward; forces premature second pull from poor position",
+            cues: ["Push the floor away", "Drive your chest up away from the floor", "Legs first"],
+            drills: ["Pause snatch at 1\" off floor + at knee (3s holds)", "Halting snatch deadlift to mid-thigh (3s pause)", "Slow-pull snatch (3–4s tempo floor to knee)"],
+            barPath: "forward-off-floor" },
+          { error: "Bar drifts away from shins/thighs", freq: "high",
+            rootCause: "Insufficient lat engagement; shoulders yielding forward; no 'slack pull' before separation; knees not clearing bar path",
+            downstream: "Forward bar loop at hip; excessive banging at contact; bar crashes forward in catch; forward jump",
+            cues: ["Paint your legs with the bar", "Spread the floor with your feet", "Drag the bar up a wall"],
+            drills: ["Snatch segment deadlift (floor → knee → mid-thigh)", "Snatch with pause at knee (verify contact)", "Snatch pull with slow eccentric"],
+            barPath: "no-sweep-to-body" }
+        ]},
+      { name: "Transition",
+        errors: [
+          { error: "Initiates explosion too early (at/above knee)", freq: "high",
+            rootCause: "Impatience — strong athletes want to 'explode' ASAP; poor position at knee forces early opening",
+            downstream: "Reduces acceleration zone; bar doesn't reach proper contact height; bleeds power; inconsistent contact",
+            cues: ["Stay over the bar until it finds your pockets", "Cover the bar with your chest", "Patience to the power position"],
+            drills: ["3× snatch deadlift (knee→hip) + 1 snatch", "Hang snatch from knee", "Segment snatch (pause knee + mid-thigh + snatch)"],
+            barPath: "separates-at-knee" },
+          { error: "Torso opens / shoulders rise behind bar too early", freq: "med",
+            rootCause: "Back-dominant athlete levers up; rushing to get 'tall' before bar reaches power position",
+            downstream: "Hips drive horizontally into bar; bar pushed forward; loop in bar path; forward catch or miss",
+            cues: ["Shoulders over the bar until the last second", "Let the bar come to YOU", "Stay patient"],
+            drills: ["Halting snatch DL to mid-thigh (check shoulder position)", "Slow-tempo RDL with bar contact (snatch grip)", "Hang snatch from mid-thigh"],
+            barPath: "separates-at-knee" },
+          { error: "Bar doesn't sweep back into hip after passing knees", freq: "high",
+            rootCause: "Double knee bend / scoop not firing — knees don't re-bend under the bar; lats disengage after bar clears knees; torso opens too early so hips can't get under bar",
+            downstream: "Bar hangs at arm's length when you extend; no contact or bad-angle contact off lower thigh; bar launched forward; power leaks",
+            cues: ["Let the bar find your pockets", "Sweep the bar into your hip crease", "Close the gap"],
+            drills: ["Halting snatch DL to mid-thigh (bar MUST be touching at pause)", "Segment pulls: pause at knee → pause at hip crease (bar closer at each)", "Slow-tempo hang snatch from knee (2–3s to navigate to power position, then explode)"],
+            barPath: "separates-at-knee" }
+        ]},
+      { name: "Second Pull",
+        errors: [
+          { error: "Excessive hip bang / horizontal hip thrust", freq: "high",
+            rootCause: "Conceptualizing movement as hip thrust, not vertical jump; trunk opened too early; bar too far from body before contact",
+            downstream: "Bar launched forward in arc; forward jump to chase; inconsistent catch; limits max weight",
+            cues: ["Jump the bar straight up", "Hips UP, not THROUGH", "The bar moves because the floor moves"],
+            drills: ["Snatch with no contact / no brush", "Snatch from power position (dip snatch)", "Snatch pull (90–110%, vertical extension)"],
+            barPath: "forward-loop-after-contact" },
+          { error: "Incomplete triple extension / cutting the pull", freq: "high",
+            rootCause: "Strong athletes muscle moderate weights without full extension; never develop patience to 'get tall'; rushing under",
+            downstream: "Ceiling on snatch weight at power snatch capacity; low bar height forces pressing out",
+            cues: ["Get tall before you go down", "Drive the floor away as long as you can", "Finish, THEN go"],
+            drills: ["Muscle snatch (impossible not to finish)", "Snatch pull to full extension + shrug", "Snatch high pull + snatch complex"],
+            barPath: "forward-loop-after-contact" },
+          { error: "Early arm bend / reverse curl pattern", freq: "high",
+            rootCause: "Default to upper body strength; hasn't learned to generate power from legs; arms actively curling instead of relaxed",
+            downstream: "Blunts power transfer from legs; slows turnover; bar path loops; limits weight progression",
+            cues: ["Arms are ropes — bar hangs from hooks", "Loose arms, fast legs", "The bar floats up, you don't lift it"],
+            drills: ["Muscle snatch (exposes cheating immediately)", "Snatch from power position (forces leg drive)", "Snatch high pull (elbows high and outside)"],
+            barPath: "forward-loop-after-contact" }
+        ]},
+      { name: "Third Pull",
+        errors: [
+          { error: "Passive pull-under / 'launch and pray'", freq: "med",
+            rootCause: "Pulls with all might during 1st/2nd pull then simply falls under; no active pull-under training",
+            downstream: "Bar crashing; limits max loads; inconsistency above 85%; misses forward",
+            cues: ["Rip down, punch up", "Beat the bar to the bottom", "Pull bar to your chest, then punch ceiling"],
+            drills: ["Tall snatch (zero leg drive — pure speed under)", "Snatch balance (speed + commitment)", "High hang snatch (minimal pull forces aggression)"],
+            barPath: "no-return-in-turnover" },
+          { error: "Bar loops forward during turnover", freq: "med",
+            rootCause: "Stiff locked elbows at top of pull; excessive hip bang upstream; elbows point backward not out",
+            downstream: "Must chase bar forward; forward jump; unstable catch; pressing out",
+            cues: ["Keep the bar on the tracks overhead", "Elbows high and outside, then punch", "Guide the bar, don't throw it"],
+            drills: ["Snatch from power position (isolates bar path)", "Drop snatch (pure speed)", "Snatch balance heavy (bar control overhead)"],
+            barPath: "no-return-in-turnover" }
+        ]},
+      { name: "Receiving",
+        errors: [
+          { error: "Catches high / power snatches everything", freq: "high",
+            rootCause: "Discomfort in deep overhead squat; insufficient bottom position practice; fear of commitment; mobility limitations",
+            downstream: "Weight ceiling at power snatch capacity; athlete 'stuck' at plateau",
+            cues: ["Pull yourself to the floor", "Sit INTO the bar", "Own the bottom before you stand"],
+            drills: ["OHS with 3–5s pause at bottom", "Snatch balance (progressively heavier)", "Hold every snatch in bottom 2–3s before recovery"],
+            barPath: "caught-forward" },
+          { error: "Soft lockout / elbows bend on catch", freq: "med",
+            rootCause: "Not actively pushing up against bar; weak scapular stabilizers; poor lockout timing",
+            downstream: "No-lift in competition (press-out); unstable overhead",
+            cues: ["Punch the bar through the roof", "Press UP as you sit DOWN", "Lock and hold"],
+            drills: ["BTN snatch-grip push press + pause OHS", "Sots press", "Snatch with 3s overhead hold"],
+            barPath: "caught-forward" }
+        ]}
+    ]
+  },
+  clean: {
+    label: "Clean", color: "#6b2c2c", accent: "#a04040", light: "#f7dce0",
+    phases: [
+      { name: "First Pull & Transition",
+        errors: [
+          { error: "Hips shoot up / stripper pull", freq: "med",
+            rootCause: "Insufficient quad strength, hips too low, yanking without tension. Narrower grip = higher hips, slightly less common",
+            downstream: "Forward balance; back horizontal; bar drifts away; early arm bend compensation",
+            cues: ["Push the floor away", "Chest and hips rise together — glued", "Legs first, patience"],
+            drills: ["Halting clean deadlift to mid-thigh (3s pause)", "Pause clean at 1\" off floor + at knee", "Slow-pull clean (3–4s tempo)"],
+            barPath: "forward-off-floor" },
+          { error: "Bar drifts forward off shins", freq: "med",
+            rootCause: "Insufficient lat engagement; not pulling bar into body before separation; weak upper back under load",
+            downstream: "Bar swings around knees; early arm bend; forward loop at hip; crash in rack",
+            cues: ["Sweep the bar back into your thighs", "Paint your legs", "Lats on before you pull"],
+            drills: ["Clean segment deadlift (floor → knee → mid-thigh)", "Clean pull with 3s pause at knee", "Halting clean DL (verify proximity)"],
+            barPath: "no-sweep-to-body" },
+          { error: "Bar doesn't sweep back into hip after passing knees", freq: "high",
+            rootCause: "Double knee bend / scoop not happening; lats disengage after knee; torso opens too early preventing hips from getting under bar",
+            downstream: "Bar at arm's length at extension; poor contact angle; bar launched forward; significant power leak",
+            cues: ["Let the bar find your pockets", "Close the gap", "Sweep the bar into your hip"],
+            drills: ["Halting clean DL to mid-thigh (bar MUST touch at pause)", "Segment pulls: pause at knee → pause at hip (bar closer each time)", "Slow-tempo hang clean from knee (2–3s to power position, then explode)"],
+            barPath: "separates-at-knee" }
+        ]},
+      { name: "Second Pull",
+        errors: [
+          { error: "Early arm bend / reverse curl (SIGNATURE muscler error)", freq: "high",
+            rootCause: "Disproportionate upper body strength; default to bicep/deltoid power; masks leg drive deficiency",
+            downstream: "'When arms bend, power ends' — limits absolute weight; slow elbow spin; bar crashes onto shoulders",
+            cues: ["Arms are ropes — they don't pull", "Jump the bar off your legs", "Legs first, THEN punch"],
+            drills: ["Clean from power position (eliminates arm pulling)", "Clean pull to full extension (90–110%)", "No-feet clean (continuous leg push)"],
+            barPath: "forward-loop-after-contact" },
+          { error: "Horizontal hip slam into bar", freq: "med",
+            rootCause: "Conceptualizes clean as 'slamming hips into bar'; trunk opened too early; bar too far approaching contact",
+            downstream: "Bar trajectory horizontal; must chase forward; elbows crash; collar bone impact",
+            cues: ["Hips UP, not THROUGH", "Jump, don't thrust", "The bar moves because the floor moves"],
+            drills: ["Clean with no brush/no contact", "Clean from power position", "Power clean + clean complex"],
+            barPath: "forward-loop-after-contact" },
+          { error: "Incomplete extension / cutting the pull", freq: "high",
+            rootCause: "Already pulling with arms; never reaches full triple extension; strong enough to muscle moderate weights",
+            downstream: "Bar doesn't reach adequate height; must curl into rack; crashing; limits max clean",
+            cues: ["Finish tall, then sit", "Get tall before you turn it over", "Drive the floor away as long as you can"],
+            drills: ["Muscle clean (forces complete extension)", "Clean pull + clean complex", "Clean from power position"],
+            barPath: "forward-loop-after-contact" }
+        ]},
+      { name: "Third Pull (Turnover)",
+        errors: [
+          { error: "Reverse curls bar to shoulders (curl instead of spin)", freq: "high",
+            rootCause: "Elbows oriented backward (not out); grip released too early; upstream arm pulling creates muscling pattern",
+            downstream: "Slow imprecise turnover; bar crashes onto shoulders; inconsistency above 85%; wrist/elbow pain",
+            cues: ["Spin the elbows AROUND the bar", "Pull bar back into your throat", "Punch elbows to the wall in front"],
+            drills: ["Tall muscle clean (empty bar — curl vs. spin)", "Tall clean (self-limiting)", "Scarecrow clean (isolates final turnover)"],
+            barPath: "no-return-in-turnover" },
+          { error: "Passive pull-under / slow turnover", freq: "med",
+            rootCause: "Extends then simply falls; no active engagement after second pull; insufficient elbow speed",
+            downstream: "Bar crashes with excessive force; forward collapse; limits max clean",
+            cues: ["Rip down and punch elbows up", "Beat the bar to the bottom", "Aggressive elbows"],
+            drills: ["Muscle clean + clean complex", "Tall clean (25–40% only)", "High hang clean (forces speed)"],
+            barPath: "no-return-in-turnover" }
+        ]},
+      { name: "Receiving (Front Rack)",
+        errors: [
+          { error: "Elbows point down / poor front rack", freq: "high",
+            rootCause: "Tight lats, triceps, thoracic spine; poor turnover feeding poor rack arrival; wrist limitations",
+            downstream: "Bar held by wrists not shoulders; forward collapse; wrist/elbow pain; missed lifts heavier",
+            cues: ["Elbows to the ceiling", "Chest UP into the bar", "Stand up with your elbows"],
+            drills: ["Zombie front squat (no hands)", "Front rack holds (heavy, 10–15s)", "Lat/tricep/wrist mobility (5min pre-session)"],
+            barPath: "caught-forward" },
+          { error: "Forward collapse in catch / bar crashes", freq: "med",
+            rootCause: "Weak thoracic extensors; insufficient front squat practice; poor bracing; doesn't actively meet bar",
+            downstream: "Dumped forward; limits clean max well below pull capacity",
+            cues: ["Big breath, brace like a punch is coming", "Lock in at the bottom", "Meet the bar — don't let it crash"],
+            drills: ["Pause front squat (3–5s at bottom)", "Clean with pause in catch (2–3s)", "Front squat clusters (heavy singles)"],
+            barPath: "caught-forward" }
+        ]}
+    ]
+  },
+  jerk: {
+    label: "Jerk", color: "#4a3b6b", accent: "#7c6baa", light: "#e8e0f7",
+    phases: [
+      { name: "The Dip",
+        errors: [
+          { error: "Forward dip (torso pitches forward, weight to toes)", freq: "high",
+            rootCause: "Initiating dip by sitting hips BACK (squat pattern) instead of bending knees only; strength athletes default to hip hinge",
+            downstream: "Forward drive; bar lands ahead of base; missed forward; #1 cause of jerk failure",
+            cues: ["Piston straight down — elevator, not escalator", "Pressure on the heels", "Bar and hips stacked over ankles"],
+            drills: ["Pause jerk dip squats (3–5s ecc, 2–3s pause)", "Pause jerk (hold bottom 2–3s, drive from stop)", "Push press (enforces vertical dip/drive)"],
+            barPath: null },
+          { error: "Dip too deep (past ~10% of height)", freq: "med",
+            rootCause: "Trying to generate more power; loses elastic SSC benefit; bar separates from shoulders",
+            downstream: "Loss of elasticity; forward pitch; slow drive; pressing out",
+            cues: ["Short and sharp", "Quick down, FAST up", "Bar glued to shoulders the whole time"],
+            drills: ["Jerk dip squats to depth marker (tape)", "Push press (too deep = fail)", "Jerk drives (dip+drive only, 85–110%)"],
+            barPath: null }
+        ]},
+      { name: "The Drive",
+        errors: [
+          { error: "Cutting the drive / pressing before bar leaves shoulders", freq: "high",
+            rootCause: "Poor leg drive strength relative to load; compensating with pressing ('arm jerk')",
+            downstream: "Bar doesn't reach height; press-out (illegal); jerk max ≈ press capacity",
+            cues: ["Drive bar off shoulders, THEN split", "Push the bar straight to the ceiling", "Finish tall before you go down"],
+            drills: ["Push press (#1 jerk assistance exercise)", "Jerk drives at 85–110% (full drive, re-rack)", "Power jerk (demands more bar elevation)"],
+            barPath: null },
+          { error: "Press-out (arms not locked at catch)", freq: "med",
+            rootCause: "Insufficient bar elevation from legs (primary); delayed punch-under; limited shoulder mobility; lack of aggression",
+            downstream: "No-lift / red lights in competition; unstable overhead; confidence erosion",
+            cues: ["Punch the ceiling", "Push yourself DOWN, not the bar up", "Lock it NOW"],
+            drills: ["All BTN variations (push press, power jerk, split jerk)", "Tall jerk (press to eye level, hold, drop under)", "Jerk from behind neck"],
+            barPath: null }
+        ]},
+      { name: "The Split",
+        errors: [
+          { error: "Short front foot / insufficient split depth", freq: "med",
+            rootCause: "Usually a DRIVE problem — insufficient bar elevation pushes athlete down before foot reaches; fear of committing",
+            downstream: "Unstable receiving; pressing out; forward miss; inconsistency heavy",
+            cues: ["Drive first, THEN split", "Reach front foot to a target (tape)", "Chest UP as you split"],
+            drills: ["Jerk balance (only front foot moves)", "Drop-to-split (from standing)", "Jerk from pins (start in split, recover)"],
+            barPath: null },
+          { error: "Head/chest dives forward into split", freq: "med",
+            rootCause: "Confuses 'get under' with 'lean forward'; hips left behind bar; may compensate for forward dip upstream",
+            downstream: "Severe instability; bar forward of base; missed forward consistently",
+            cues: ["Push UP through the bar as you split", "50/50 weight between both feet", "Bar stays over your ears"],
+            drills: ["Jerk balance (Everett's Rx for head-diving)", "Tall jerk (no dip — pure punch-under)", "OH walking lunges in split position"],
+            barPath: null },
+          { error: "Back foot flat / straight leg / over-reaching", freq: "low",
+            rootCause: "Incorrect split model; back knee should be slightly bent, ball of foot on floor, not flat",
+            downstream: "Anterior pelvic tilt; lumbar hyperextension; forward lean; difficult recovery",
+            cues: ["Soft back knee", "Ball of the back foot, not toes", "Front foot back FIRST to recover"],
+            drills: ["Drop-to-split with position check", "Jerk recovery from pins (above-max)", "Split jerk + 3s hold before recovery"],
+            barPath: null }
+        ]}
+    ]
+  }
+};
+
+const ALL_ERRORS = Object.entries(LIFTS).flatMap(([liftKey, lift]) =>
+  lift.phases.flatMap((phase, pi) =>
+    phase.errors.map((err, ei) => ({
+      ...err, liftKey, liftLabel: lift.label,
+      phaseName: phase.name, phaseIndex: pi,
+      id: `${liftKey}-${pi}-${ei}`
+    }))
+  )
+);
+
+const BAR_PATH_DEVIATIONS = [
+  { id: "forward-off-floor", label: "Bar forward off floor", phase: "First Pull", cause: "Hips too high; yanking; poor start" },
+  { id: "no-sweep-to-body", label: "Bar doesn't sweep toward body", phase: "First Pull", cause: "Lats disengaged; knees not clearing" },
+  { id: "separates-at-knee", label: "Bar separates / doesn't return to hip", phase: "Transition", cause: "No scoop; torso opens early; lats disengage" },
+  { id: "forward-loop-after-contact", label: "Forward loop after contact", phase: "Second Pull", cause: "Horizontal hip thrust; locked elbows; incomplete extension" },
+  { id: "no-return-in-turnover", label: "Bar doesn't return in turnover", phase: "Third Pull", cause: "Passive turnover; no active pull-under" },
+  { id: "caught-forward", label: "Bar caught forward of start", phase: "Catch", cause: "Upstream errors; poor posture; no bar direction" },
+];
+
+function SearchIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>;
+}
+
+function ChevronIcon({ open }) {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}><path d="m9 18 6-6-6-6"/></svg>;
+}
+
+function FreqDot({ freq }) {
+  const colors = { high: "#c0392b", med: "#d4a017", low: "#7f8c8d" };
+  const labels = { high: "Common", med: "Moderate", low: "Less common" };
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10px", color: colors[freq], fontWeight: 600 }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: colors[freq], display: "inline-block" }}/>
+      {labels[freq]}
+    </span>
+  );
+}
+
+function ErrorCard({ item, isExpanded, onToggle, liftData, compact }) {
+  const c = liftData;
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (isExpanded && cardRef.current) {
+      setTimeout(() => {
+        cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 60);
+    }
+  }, [isExpanded]);
+
+  if (compact) {
+    return (
+      <div style={{
+        background: "#fff", borderRadius: "8px", border: "1px solid #e2e6ed",
+        padding: "12px 14px", marginBottom: "6px", borderLeft: `4px solid ${c.accent}`,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: "#1a1a2e", lineHeight: 1.3, flex: 1 }}>{item.error}</div>
+          <FreqDot freq={item.freq} />
+        </div>
+        <div style={{
+          marginTop: "8px", padding: "8px 12px", background: c.light,
+          borderRadius: "6px", fontSize: "15px", fontWeight: 700,
+          fontStyle: "italic", color: c.color, lineHeight: 1.3,
+        }}>"{item.cues[0]}"</div>
+        <div style={{ marginTop: "6px", fontSize: "11px", color: "#888" }}>
+          {item.liftLabel} › {item.phaseName} &nbsp;|&nbsp; Top drill: {item.drills[0]}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={cardRef} style={{
+      background: "#fff", borderRadius: "10px",
+      border: `1px solid ${isExpanded ? c.accent + "50" : "#e2e6ed"}`,
+      marginBottom: "8px", overflow: "hidden",
+      boxShadow: isExpanded ? `0 2px 12px ${c.accent}12` : "0 1px 2px rgba(0,0,0,0.03)",
+      transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+      borderLeft: `4px solid ${c.accent}`,
+    }}>
+      <button onClick={onToggle} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: "10px",
+        padding: "14px 14px", background: "transparent", border: "none",
+        cursor: "pointer", textAlign: "left", minHeight: "48px",
+      }}>
+        <span style={{ color: c.accent, flexShrink: 0 }}><ChevronIcon open={isExpanded} /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "#1a1a2e", lineHeight: 1.3 }}>{item.error}</div>
+          <div style={{ marginTop: "4px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "11px", color: "#888", fontWeight: 500 }}>{item.liftLabel} › {item.phaseName}</span>
+            <FreqDot freq={item.freq} />
+          </div>
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div style={{ padding: "0 14px 16px 28px" }}>
+          <div style={{ display: "grid", gap: "10px", gridTemplateColumns: "1fr", marginBottom: "12px" }}>
+            <div style={{ background: "#fff8f0", borderRadius: "8px", padding: "10px 12px", border: "1px solid #b85c0015" }}>
+              <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.06em", color: "#b85c00", marginBottom: "4px" }}>ROOT CAUSE</div>
+              <div style={{ fontSize: "13px", color: "#2c2c2c", lineHeight: 1.45 }}>{item.rootCause}</div>
+            </div>
+            <div style={{ background: "#fef5f5", borderRadius: "8px", padding: "10px 12px", border: "1px solid #c0392b12" }}>
+              <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.06em", color: "#c0392b", marginBottom: "4px" }}>DOWNSTREAM EFFECT</div>
+              <div style={{ fontSize: "13px", color: "#2c2c2c", lineHeight: 1.45 }}>{item.downstream}</div>
+            </div>
+          </div>
+          <div style={{ marginBottom: "12px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.06em", color: c.accent, marginBottom: "6px" }}>CUES</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              {item.cues.map((cue, i) => (
+                <div key={i} style={{
+                  padding: "10px 14px", background: c.light, borderRadius: "8px",
+                  border: `1px solid ${c.accent}20`,
+                  fontSize: i === 0 ? "16px" : "14px",
+                  fontWeight: 700, fontStyle: "italic", color: c.color, lineHeight: 1.25,
+                }}>"{cue}"</div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.06em", color: "#1a6b3a", marginBottom: "6px" }}>DRILLS (Priority Order)</div>
+            <div style={{ background: "#f0faf5", borderRadius: "8px", padding: "10px 12px", border: "1px solid #1a6b3a12" }}>
+              <ol style={{ margin: 0, paddingLeft: "16px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                {item.drills.map((drill, i) => (
+                  <li key={i} style={{ fontSize: "13px", color: "#2c2c2c", lineHeight: 1.4 }}>{drill}</li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [search, setSearch] = useState("");
+  const [liftFilter, setLiftFilter] = useState("all");
+  const [phaseFilter, setPhaseFilter] = useState("all");
+  const [expandedIds, setExpandedIds] = useState(new Set());
+  const [compact, setCompact] = useState(false);
+  const [barPathFilter, setBarPathFilter] = useState(null);
+  const [showBarPath, setShowBarPath] = useState(false);
+
+  const toggleExpand = useCallback((id) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const filteredErrors = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return ALL_ERRORS.filter(item => {
+      if (liftFilter !== "all" && item.liftKey !== liftFilter) return false;
+      if (phaseFilter !== "all" && !item.phaseName.toLowerCase().includes(phaseFilter)) return false;
+      if (barPathFilter && item.barPath !== barPathFilter) return false;
+      if (!q) return true;
+      const searchable = [item.error, item.rootCause, item.downstream, ...item.cues, ...item.drills, item.barPath || ""].join(" ").toLowerCase();
+      return q.split(/\s+/).every(w => searchable.includes(w));
+    });
+  }, [search, liftFilter, phaseFilter, barPathFilter]);
+
+  const phases = useMemo(() => {
+    if (liftFilter === "all") return [];
+    return LIFTS[liftFilter].phases.map(p => p.name);
+  }, [liftFilter]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f3f5f9" }}>
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #2c3e6b 60%, #4a3b6b 100%)",
+        padding: "20px 16px 16px", color: "#fff",
+        position: "sticky", top: 0, zIndex: 100,
+        boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+      }}>
+        <div style={{ maxWidth: "960px", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, letterSpacing: "-0.01em" }}>Error Correction</h1>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", opacity: 0.55 }}>USAW · Root-Cause · FHSAA</p>
+            </div>
+            <button onClick={() => setCompact(!compact)} style={{
+              padding: "7px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+              border: "1px solid rgba(255,255,255,0.25)", cursor: "pointer",
+              background: compact ? "rgba(255,255,255,0.2)" : "transparent", color: "#fff",
+            }}>{compact ? "◉ Quick Cue" : "○ Quick Cue"}</button>
+          </div>
+
+          <div style={{ marginTop: "12px", position: "relative" }}>
+            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#8090b0" }}><SearchIcon /></span>
+            <input type="text" placeholder="Search errors, cues, drills..."
+              value={search} onChange={e => { setSearch(e.target.value); setBarPathFilter(null); }}
+              style={{
+                width: "100%", padding: "12px 14px 12px 40px", borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.08)", color: "#fff", fontSize: "15px", boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+            {[{ key: "all", label: "All", col: "#fff" }, { key: "snatch", label: "Snatch", col: "#7eb3ff" }, { key: "clean", label: "Clean", col: "#ff9e9e" }, { key: "jerk", label: "Jerk", col: "#c4b3ff" }].map(f => (
+              <button key={f.key} onClick={() => { setLiftFilter(f.key); setPhaseFilter("all"); setBarPathFilter(null); }} style={{
+                flex: 1, padding: "10px 0", borderRadius: "8px",
+                border: `2px solid ${liftFilter === f.key ? f.col : "rgba(255,255,255,0.12)"}`,
+                background: liftFilter === f.key ? "rgba(255,255,255,0.15)" : "transparent",
+                color: liftFilter === f.key ? f.col : "rgba(255,255,255,0.6)",
+                fontSize: "13px", fontWeight: liftFilter === f.key ? 800 : 500, cursor: "pointer",
+              }}>{f.label}</button>
+            ))}
+          </div>
+
+          {phases.length > 0 && (
+            <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+              <button onClick={() => setPhaseFilter("all")} style={{
+                padding: "8px 14px", borderRadius: "7px", border: "1px solid rgba(255,255,255,0.15)",
+                background: phaseFilter === "all" ? "rgba(255,255,255,0.15)" : "transparent",
+                color: "#fff", fontSize: "12px", fontWeight: phaseFilter === "all" ? 700 : 400, cursor: "pointer",
+              }}>All</button>
+              {phases.map(p => {
+                const key = p.toLowerCase();
+                return (
+                  <button key={key} onClick={() => setPhaseFilter(phaseFilter === key ? "all" : key)} style={{
+                    padding: "8px 14px", borderRadius: "7px", border: "1px solid rgba(255,255,255,0.15)",
+                    background: phaseFilter === key ? "rgba(255,255,255,0.15)" : "transparent",
+                    color: "#fff", fontSize: "12px", fontWeight: phaseFilter === key ? 700 : 400, cursor: "pointer",
+                  }}>{p}</button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: "960px", margin: "0 auto", padding: "12px 12px 60px" }}>
+        {barPathFilter && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 14px", background: "#e8f5ed", border: "1px solid #2c6b2c25",
+            borderRadius: "8px", marginBottom: "10px",
+          }}>
+            <div style={{ fontSize: "12px", color: "#2c6b2c", fontWeight: 600 }}>
+              Filtering: <strong>{BAR_PATH_DEVIATIONS.find(b => b.id === barPathFilter)?.label}</strong>
+            </div>
+            <button onClick={() => { setBarPathFilter(null); setShowBarPath(false); }} style={{
+              padding: "4px 10px", borderRadius: "5px", border: "1px solid #2c6b2c40",
+              background: "#fff", color: "#2c6b2c", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+            }}>Clear</button>
+          </div>
+        )}
+
+        <button onClick={() => setShowBarPath(!showBarPath)} style={{
+          width: "100%", padding: "11px 14px", borderRadius: "8px",
+          border: "1px solid #2c6b2c25", background: showBarPath ? "#e8f5ed" : "#fff",
+          cursor: "pointer", textAlign: "left", fontSize: "12px", fontWeight: 600, color: "#2c6b2c", marginBottom: "10px",
+        }}>{showBarPath ? "▾" : "▸"} Bar Path → Error Lookup</button>
+
+        {showBarPath && (
+          <div style={{
+            background: "#f0faf5", border: "1px solid #2c6b2c20", borderRadius: "10px",
+            padding: "12px", marginBottom: "12px",
+          }}>
+            <div style={{ fontSize: "11px", color: "#666", marginBottom: "8px" }}>Tap a deviation to filter errors that cause it:</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {BAR_PATH_DEVIATIONS.map(bp => (
+                <button key={bp.id} onClick={() => { setBarPathFilter(barPathFilter === bp.id ? null : bp.id); setShowBarPath(false); }}
+                  className="bp-grid" style={{
+                    display: "grid", gridTemplateColumns: "1fr auto 1.5fr", gap: "8px", alignItems: "center",
+                    padding: "10px 12px", borderRadius: "7px", border: `1px solid ${barPathFilter === bp.id ? "#2c6b2c50" : "#dde8dd"}`,
+                    background: barPathFilter === bp.id ? "#d4edda" : "#fff",
+                    cursor: "pointer", textAlign: "left", width: "100%", fontSize: "12px",
+                  }}>
+                  <div style={{ fontWeight: 700, color: "#1a3a1a" }}>{bp.label}</div>
+                  <div className="bp-phase-cell" style={{ fontWeight: 600, color: "#c0392b", fontSize: "11px", whiteSpace: "nowrap" }}>{bp.phase}</div>
+                  <div style={{ color: "#555", fontSize: "11px" }}>{bp.cause}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: "12px", color: "#999", marginBottom: "8px", fontWeight: 500, paddingLeft: "2px" }}>
+          {filteredErrors.length} error{filteredErrors.length !== 1 ? "s" : ""}{barPathFilter ? " matching bar path" : ""}
+        </div>
+
+        {filteredErrors.map(item => (
+          <ErrorCard key={item.id} item={item}
+            isExpanded={expandedIds.has(item.id)}
+            onToggle={() => toggleExpand(item.id)}
+            liftData={LIFTS[item.liftKey]} compact={compact} />
+        ))}
+
+        {filteredErrors.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: "#999", fontSize: "14px" }}>No errors match. Try broader terms or clear filters.</div>
+        )}
+
+        <div style={{
+          marginTop: "20px", padding: "12px", borderRadius: "8px", background: "#eaecf0",
+          fontSize: "10px", color: "#999", textAlign: "center", lineHeight: 1.5,
+        }}>
+          USAW · Catalyst Athletics · Dozer · Wulf (2013) · Schutts et al. (2017) · Cunanan et al. (2020)<br/>WL Analysis · Kinovea · Built for FHSAA
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
